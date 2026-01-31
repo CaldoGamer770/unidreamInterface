@@ -9,7 +9,7 @@ export default function CareersPage() {
     const [loading, setLoading] = useState(true);
 
     const [page, setPage] = useState(1);
-    const limit = 6;
+    const limit = 5;
 
     const [filtroActivo, setFiltroActivo] = useState<
         "IA" | "Todas" | "Ingeniería" | "Salud"
@@ -173,9 +173,26 @@ export default function CareersPage() {
                                     </div>
                                 </div>
 
-                                <p className="text-[#4C4C9A] text-sm leading-relaxed max-w-2xl mt-2 font-normal">
-                                    {carrera.descripcion}
-                                </p>
+                                <div className="mt-3">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-1">
+                                        Descripción
+                                    </h4>
+
+                                    <div className="
+                                    text-sm
+                                    text-gray-600
+                                    max-h-28
+                                    overflow-y-auto
+                                    pr-2
+                                    leading-relaxed
+                                    scrollbar-thin
+                                    scrollbar-thumb-gray-300
+                                    scrollbar-track-transparent
+                                    ">
+                                        {carrera.descripcion || "Sin descripción disponible"}
+                                    </div>
+                                </div>
+
                             </div>
 
                             <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto">
