@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Career } from "../../types/Career";
 import { getCareers } from "../../services/careers";
+import Filtros from "./Filtros";
+import CareersGrid from "./CareersGrid";
+import CareersSkeleton from "./CareersSkeleton";
+import Pagination from "./Pagination";
 
 export default function CareersPage() {
     const navigate = useNavigate();
@@ -19,25 +23,17 @@ export default function CareersPage() {
     const [carreraSeleccionada, setCarreraSeleccionada] = useState<Career | null>(null);
 
     useEffect(() => {
-        let isMounted = true;
         setLoading(true);
-
-        getCareers(page, limit)
-            .then((data) => {
-                if (isMounted) setCareers(data);
-            })
-            .catch((error) => console.error(error))
-            .finally(() => {
-                if (isMounted) setLoading(false);
-            });
-
-        return () => { isMounted = false; };
+        getCareers(page).then(newData => {
+            setCareers(newData);
+            setLoading(false);
+        });
     }, [page]);
 
-
-
-    const textMenuClass = "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
-    const buttonPressEffect = "transition-transform duration-100 active:scale-95";
+    const textMenuClass =
+        "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
+    const buttonPressEffect =
+        "transition-transform duration-100 active:scale-95";
 
     const carrerasFiltradas = careers
         .filter(c =>
@@ -55,21 +51,13 @@ export default function CareersPage() {
         );
     }
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <span className="text-gray-500">Cargando carreras...</span>
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col bg-white min-h-screen relative">
 
             {/* --- NAVBAR --- */}
             <div className="flex justify-between items-center bg-[#FFFFFFCC] py-4 px-10 sticky top-0 z-40 backdrop-blur-sm shadow-sm">
                 <img
-                    src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/549wbqn9_expires_30_days.png"}
+                    src="https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/549wbqn9_expires_30_days.png"
                     className="w-[148px] h-[42px] object-contain cursor-pointer"
                     onClick={() => navigate("/")}
                     alt="UniDream Logo"
@@ -87,6 +75,35 @@ export default function CareersPage() {
                     <span className="text-white text-sm font-bold">Asistente IA</span>
                 </button>
             </div>
+
+            {/* Filtros, tabs, buscador → nunca desaparecen */}
+            <div className="px-6 py-4">
+                <Filtros
+                    filtroActivo={filtroActivo}
+                    setFiltroActivo={setFiltroActivo}
+                    busqueda={busqueda}
+                    setBusqueda={setBusqueda}
+                />
+
+                {/* SOLO esta parte cambia */}
+                <section className="mt-6">
+                    {loading ? (
+                        <CareersSkeleton />
+                    ) : (
+                        <CareersGrid
+                            careers={carrerasFiltradas}
+                            onSelect={setCarreraSeleccionada}
+                        />
+                    )}
+                </section>
+
+                {/* Paginación */}
+                <Pagination
+                    page={page}
+                    setPage={setPage}
+                />
+            </div>
+
 
             {/* --- HEADER --- */}
             <div className="flex flex-col self-stretch max-w-[1152px] mb-8 mx-auto gap-8 mt-10 px-4">
