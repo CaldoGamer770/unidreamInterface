@@ -161,77 +161,7 @@ export default function CareersPage() {
                 </div>
             </div>
 
-            {/* --- LISTA DE RESULTADOS --- */}
-            <div className="flex flex-col self-stretch max-w-[1152px] mx-auto gap-6 mb-20 px-4 min-h-[400px]">
-
-                {carrerasFiltradas.length > 0 ? (
-                    carrerasFiltradas.map((carrera) => (
-                        <div key={carrera.id} className="flex flex-col md:flex-row items-center bg-[#F6F9FA] p-8 gap-8 rounded-[48px] hover:shadow-lg transition-shadow duration-300">
-
-                            <div className="w-32 h-32 rounded-[32px] bg-white flex items-center justify-center shadow-sm shrink-0">
-                                <img src={carrera.imagen ?? ""} className="w-16 h-16 object-contain" alt={carrera.nombre} />
-                            </div>
-
-                            <div className="flex flex-1 flex-col gap-2 w-full">
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                                    <h3 className="text-[#0D0D1B] text-2xl font-bold">{carrera.nombre}</h3>
-
-                                    {filtroActivo === "IA" && (
-                                        <div className="bg-[#1313EC1A] text-[#1313EC] px-3 py-1 rounded-full text-xs font-bold border border-[#1313EC33]">
-                                            {carrera.matchIA}% AI MATCH
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-md font-bold uppercase">{carrera.area}</span>
-                                        <span className="text-[#4C4C9A] text-sm font-medium">• {carrera.duracion}</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-3">
-                                    <h4 className="text-sm font-semibold text-gray-700 mb-1">
-                                        Descripción
-                                    </h4>
-
-                                    <div className="
-                                    text-sm
-                                    text-gray-600
-                                    max-h-28
-                                    overflow-y-auto
-                                    pr-2
-                                    leading-relaxed
-                                    scrollbar-thin
-                                    scrollbar-thumb-gray-300
-                                    scrollbar-track-transparent
-                                    ">
-                                        {carrera.descripcion || "Sin descripción disponible"}
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto">
-                                <button
-                                    className={`bg-[#1313EC] text-white py-3 px-8 rounded-full font-bold hover:bg-[#0f0fb5] transition-colors ${buttonPressEffect}`}
-                                    onClick={() => setCarreraSeleccionada(carrera)}
-                                >
-                                    Ver Detalles
-                                </button>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="bg-gray-100 p-6 rounded-full mb-4">
-                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900">No encontramos esa carrera</h3>
-                        <p className="text-gray-500 mt-2 font-normal">Prueba buscando en "Todas" o revisa la ortografía.</p>
-                    </div>
-                )}
-            </div>
+            
 
             <div className="flex justify-center gap-4 mt-10">
                 <button
