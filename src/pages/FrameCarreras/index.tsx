@@ -8,6 +8,9 @@ export default function CareersPage() {
     const [careers, setCareers] = useState<Career[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const [page, setPage] = useState(1);
+    const limit = 6;
+
     const [filtroActivo, setFiltroActivo] = useState<
         "IA" | "Todas" | "Ingeniería" | "Salud"
     >("IA");
@@ -16,11 +19,22 @@ export default function CareersPage() {
     const [carreraSeleccionada, setCarreraSeleccionada] = useState<Career | null>(null);
 
     useEffect(() => {
-        getCareers()
-            .then(setCareers)
-            .catch(err => console.error("Error fetching careers:", err)) // Manejo de error básico
-            .finally(() => setLoading(false));
-    }, []);
+        let isMounted = true;
+        setLoading(true);
+
+        getCareers(page, limit)
+            .then((data) => {
+                if (isMounted) setCareers(data);
+            })
+            .catch((error) => console.error(error))
+            .finally(() => {
+                if (isMounted) setLoading(false);
+            });
+
+        return () => { isMounted = false; };
+    }, [page]);
+
+
 
     const textMenuClass = "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
     const buttonPressEffect = "transition-transform duration-100 active:scale-95";
@@ -184,6 +198,26 @@ export default function CareersPage() {
                     </div>
                 )}
             </div>
+
+            <div className="flex justify-center gap-4 mt-10">
+                <button
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                    className="px-4 py-2 rounded-full bg-gray-200 disabled:opacity-50"
+                >
+                    ← Anterior
+                </button>
+
+                <span className="font-bold">Página {page}</span>
+
+                <button
+                    onClick={() => setPage(p => p + 1)}
+                    className="px-4 py-2 rounded-full bg-gray-200"
+                >
+                    Siguiente →
+                </button>
+            </div>
+
 
             {/* --- FOOTER --- */}
             <div className="bg-white py-16 px-20 border-t border-gray-200 mt-auto">
