@@ -55,13 +55,13 @@ export default function CareersPage() {
         );
     }
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <span className="text-gray-500">Cargando carreras...</span>
-            </div>
-        );
-    }
+    //if (loading) {
+    //    return (
+    //        <div className="flex items-center justify-center min-h-screen">
+    //            <span className="text-gray-500">Cargando carreras...</span>
+    //        </div>
+    //    );
+    //}
 
     return (
         <div className="flex flex-col bg-white min-h-screen relative">
