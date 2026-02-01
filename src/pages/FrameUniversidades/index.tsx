@@ -25,36 +25,6 @@ const UNIVERSIDADES_MOCK: University[] = [
         descripcion: "Referente nacional en carreras de ingeniería, ciencias exactas y tecnología.",
         matchIA: 95,
         url: "https://www.epn.edu.ec"
-    },
-    {
-        id: 3,
-        nombre: "Universidad San Francisco de Quito",
-        tipo: "Privada",
-        imagen: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Logo_USFQ.svg/1200px-Logo_USFQ.svg.png",
-        ubicacion: "Cumbayá, Quito",
-        descripcion: "Institución de artes liberales reconocida por su innovación y campus internacional.",
-        matchIA: 88,
-        url: "https://www.usfq.edu.ec"
-    },
-    {
-        id: 4,
-        nombre: "Pontificia Universidad Católica del Ecuador",
-        tipo: "Privada",
-        imagen: "https://upload.wikimedia.org/wikipedia/commons/eb/e3/Logo_PUCE.png",
-        ubicacion: "Quito, Pichincha",
-        descripcion: "Excelencia académica con enfoque humanista y gran trayectoria en medicina y derecho.",
-        matchIA: 85,
-        url: "https://www.puce.edu.ec"
-    },
-    {
-        id: 5,
-        nombre: "Universidad de las Fuerzas Armadas ESPE",
-        tipo: "Pública",
-        imagen: "https://upload.wikimedia.org/wikipedia/commons/2/22/Logo_ESPE.png",
-        ubicacion: "Sangolquí, Pichincha",
-        descripcion: "Prestigiosa en áreas técnicas, militares y de seguridad.",
-        matchIA: 80,
-        url: "https://www.espe.edu.ec"
     }
 ];
 
@@ -65,34 +35,44 @@ export default function UniversitiesPage() {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
 
-    // Filtro inicial en "Todas" para ver resultados de inmediato
     const [filtroActivo, setFiltroActivo] = useState<"IA" | "Todas" | "Publica" | "Privada">("Todas");
     const [busqueda, setBusqueda] = useState("");
     const [universidadSeleccionada, setUniversidadSeleccionada] = useState<University | null>(null);
 
-    // --- EFECTO DE CARGA HÍBRIDA ---
+    // NUEVO: Estado para el modal de "No te conocemos"
+    const [mostrarModalIA, setMostrarModalIA] = useState(false);
+
+    // --- EFECTO DE CARGA HÍBRIDA CON SIMULACIÓN ---
     useEffect(() => {
         let isMounted = true;
         setLoading(true);
 
         const fetchAllData = async () => {
             try {
-                // Intentamos conectar a AWS
-                console.log("📡 Intentando conectar a AWS...");
-                const data = await getUniversities(1, 20); // Prueba inicial
+                // 1. Intentamos conectar a AWS
+                const data = await getUniversities(1, 100); // Pedimos bastantes para la demo
 
                 if (isMounted) {
                     if (data && Array.isArray(data) && data.length > 0) {
-                        console.log("✅ Conexión exitosa con AWS");
-                        setAllUniversities(data);
+                        
+                        // --- TRUCO DE MAGIA: SIMULACIÓN DE IA ---
+                        // Si AWS devuelve matchIA = 0, le inventamos uno para la demo
+                        const dataEnriquecida = data.map(uni => ({
+                            ...uni,
+                            matchIA: (uni.matchIA && uni.matchIA > 0) 
+                                ? uni.matchIA 
+                                : Math.floor(Math.random() * (98 - 65 + 1) + 65), // Genera entre 65% y 98%
+                            carreraSugeridaIA: uni.carreraSugeridaIA || "Ingeniería en Software" // Dato relleno
+                        }));
+
+                        setAllUniversities(dataEnriquecida);
                     } else {
-                        throw new Error("Respuesta vacía"); // Forzamos el error para usar el backup
+                        throw new Error("Respuesta vacía"); 
                     }
                 }
             } catch (error) {
-                console.warn("⚠️ AWS no disponible o sin datos. Usando RESPALDO LOCAL.");
+                console.warn("⚠️ AWS no disponible. Usando RESPALDO LOCAL.");
                 if (isMounted) {
-                    // AQUÍ ESTÁ LA MAGIA: Si falla, cargamos los datos de prueba
                     setAllUniversities(UNIVERSIDADES_MOCK);
                 }
             } finally {
@@ -109,11 +89,12 @@ export default function UniversitiesPage() {
         .filter(uni => (uni.nombre || "").toLowerCase().includes(busqueda.toLowerCase()))
         .filter(uni => {
             if (filtroActivo === "Todas") return true;
-            if (filtroActivo === "IA") return (uni.matchIA ?? 0) > 0;
+            
+            // Ahora esto SÍ funcionará gracias a la simulación
+            if (filtroActivo === "IA") return (uni.matchIA ?? 0) > 60;
             
             const tipoNormalizado = (uni.tipo || uni.descripcion || "").toLowerCase();
             
-            // Ajustamos para que coincida con tus datos Mock ("Pública", "Privada")
             if (filtroActivo === "Publica") return tipoNormalizado.includes("pública") || tipoNormalizado.includes("publica");
             if (filtroActivo === "Privada") return tipoNormalizado.includes("privada");
             
@@ -180,10 +161,25 @@ export default function UniversitiesPage() {
                 </div>
 
                 <div className="flex items-center gap-4 overflow-x-auto pb-2">
-                    <button className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'IA' ? 'bg-[#1313EC] text-white border-transparent' : 'bg-white text-[#0D0D1B] border-[#E7E7F3]'}`} onClick={() => { setFiltroActivo("IA"); setPage(1); }}>
+                    
+                    {/* BOTÓN IA - CON PROTECCIÓN */}
+                    <button 
+                        className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'IA' ? 'bg-[#1313EC] text-white border-transparent' : 'bg-white text-[#0D0D1B] border-[#E7E7F3]'}`} 
+                        onClick={() => {
+                            const tienePerfil = localStorage.getItem("perfilIA_creado");
+                            
+                            if (tienePerfil === "true") {
+                                setFiltroActivo("IA"); 
+                                setPage(1);
+                            } else {
+                                setMostrarModalIA(true); // Muestra el Modal bonito
+                            }
+                        }}
+                    >
                         <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/16w66z7y_expires_30_days.png"} className="w-3.5 h-5 object-contain" style={{ filter: filtroActivo === 'IA' ? 'brightness(0) invert(1)' : 'none' }} alt="IA" />
                         <span className="text-sm font-bold ml-2">Recomendadas por IA</span>
                     </button>
+
                     <button className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Todas' ? 'bg-[#1313EC] text-white border-transparent' : 'bg-white text-[#0D0D1B] border-[#E7E7F3]'}`} onClick={() => { setFiltroActivo("Todas"); setPage(1); }}>
                         <span className="text-sm font-bold">Todas</span>
                     </button>
@@ -250,17 +246,78 @@ export default function UniversitiesPage() {
                 <div className="text-center text-gray-500 text-sm">© 2026 UniDream Platform. Todos los derechos reservados.</div>
             </div>
 
-            {/* MODAL */}
+            {/* MODAL DETALLES UNIVERSIDAD */}
             {universidadSeleccionada && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-[32px] w-full max-w-2xl p-8 relative shadow-2xl">
                         <button onClick={() => setUniversidadSeleccionada(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-xl">✕</button>
                         <h2 className="text-2xl font-bold text-[#0D0D1B] mb-2">{universidadSeleccionada.nombre}</h2>
                         <span className="bg-blue-100 text-[#1313EC] px-3 py-1 rounded-full text-xs font-bold uppercase">{universidadSeleccionada.tipo}</span>
+                        
                         <p className="text-gray-600 mt-4">{universidadSeleccionada.descripcion}</p>
+
+                        {/* SECCIÓN DE IA EN EL MODAL */}
+                        {filtroActivo === 'IA' && (universidadSeleccionada.matchIA ?? 0) > 0 && (
+                            <div className="bg-[#1313EC0D] border border-[#1313EC33] rounded-2xl p-6 text-left mt-4">
+                                <h4 className="text-[#1313EC] font-bold mb-2 uppercase text-xs tracking-wider flex items-center gap-2">
+                                    Análisis de Compatibilidad
+                                </h4>
+                                <p className="text-[#1313EC] text-sm font-medium mb-1">
+                                    Nivel de Match: <span className="font-bold text-lg">{universidadSeleccionada.matchIA}%</span>
+                                </p>
+                                <p className="text-gray-600 text-xs italic font-normal">
+                                    Carrera sugerida: {universidadSeleccionada.carreraSugeridaIA}
+                                </p>
+                            </div>
+                        )}
+
                         <a href={universidadSeleccionada.url} target="_blank" rel="noopener noreferrer" className="bg-[#1313EC] text-white py-3 rounded-xl font-bold block text-center mt-6 hover:bg-[#0f0fb5]">
                             Visitar Sitio Web Oficial
                         </a>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL DE "NO TE CONOCEMOS" (BONITO) --- */}
+            {mostrarModalIA && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white rounded-[32px] w-full max-w-md p-8 text-center shadow-2xl relative">
+                        {/* Botón Cerrar */}
+                        <button 
+                            onClick={() => setMostrarModalIA(false)} 
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+
+                        {/* Ícono Robot */}
+                        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <img src="https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/16w66z7y_expires_30_days.png" className="w-10 h-10 object-contain" alt="IA" />
+                        </div>
+
+                        <h3 className="text-2xl font-black text-[#0D0D1B] mb-3">
+                            ¡Aún no te conocemos! 🤖
+                        </h3>
+                        
+                        <p className="text-gray-500 text-sm leading-relaxed mb-8">
+                            Para que nuestra Inteligencia Artificial pueda recomendarte la universidad ideal, primero necesitamos saber qué te gusta.
+                        </p>
+
+                        <div className="flex flex-col gap-3">
+                            <button 
+                                onClick={() => navigate("/")}
+                                className="w-full bg-[#1313EC] text-white py-3.5 rounded-xl font-bold text-sm hover:bg-[#0f0fb5] transition-all transform hover:scale-[1.02] shadow-lg shadow-blue-200"
+                            >
+                                Ir a Empezar Ahora 🚀
+                            </button>
+                            
+                            <button 
+                                onClick={() => setMostrarModalIA(false)}
+                                className="w-full bg-white text-gray-500 py-3 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

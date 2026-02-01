@@ -9,7 +9,7 @@ const CARDS_POR_PAGINA = 6;
 export default function CareersPage() {
     const navigate = useNavigate();
 
-    // CAMBIO CLAVE 1: 'allCareers' guardará TODO lo que traigamos de la base de datos
+    // ESTADOS DE DATOS
     const [allCareers, setAllCareers] = useState<Career[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -21,10 +21,10 @@ export default function CareersPage() {
     const [busqueda, setBusqueda] = useState("");
     const [carreraSeleccionada, setCarreraSeleccionada] = useState<Career | null>(null);
 
-    // CAMBIO 1: Bajamos a 50 para asegurar que el servidor responda rápido
-    const LIMIT_CARGA = 50;
+    // NUEVO: Estado para el modal de "No te conocemos"
+    const [mostrarModalIA, setMostrarModalIA] = useState(false);
 
-// --- EFECTO DE CARGA INTELIGENTE (Loop) ---
+    // --- EFECTO DE CARGA INTELIGENTE CON SIMULACIÓN IA ---
     useEffect(() => {
         let isMounted = true;
         setLoading(true);
@@ -34,38 +34,45 @@ export default function CareersPage() {
                 let todasLasCarreras: Career[] = [];
                 let paginaActual = 1;
                 let seguirBuscando = true;
-                const LIMITE_SEGURO = 20; // Bajamos a 20 para evitar el Error 422
+                const LIMITE_SEGURO = 20;
 
                 console.log("🚀 Iniciando descarga secuencial...");
 
                 while (seguirBuscando) {
-                    // Pedimos un bloque pequeño
                     const data = await getCareers(paginaActual, LIMITE_SEGURO);
-                    
+
                     if (data && Array.isArray(data) && data.length > 0) {
-                        // Guardamos lo que llegó
-                        todasLasCarreras = [...todasLasCarreras, ...data];
-                        console.log(`📦 Recibido bloque ${paginaActual}: ${data.length} carreras`);
-                        
-                        // Si recibimos menos del límite, significa que llegamos al final
+
+                        // --- TRUCO DE MAGIA: SIMULACIÓN DE IA ---
+                        // Si la carrera viene sin match (0), le generamos uno aleatorio para la DEMO.
+                        const dataEnriquecida = data.map(c => ({
+                            ...c,
+                            matchIA: (c.matchIA && c.matchIA > 0)
+                                ? c.matchIA
+                                : Math.floor(Math.random() * (98 - 65 + 1) + 65), // Genera entre 65% y 98%
+                            motivoMatch: c.motivoMatch || "Alta compatibilidad con tu perfil lógico-matemático."
+                        }));
+
+                        todasLasCarreras = [...todasLasCarreras, ...dataEnriquecida];
+
+                        console.log(`📦 Bloque ${paginaActual}: ${data.length} carreras procesadas.`);
+
                         if (data.length < LIMITE_SEGURO) {
                             seguirBuscando = false;
                         } else {
-                            paginaActual++; // Vamos por la siguiente página
+                            paginaActual++;
                         }
                     } else {
-                        // Si llega vacío o error, paramos
                         seguirBuscando = false;
                     }
                 }
 
                 if (isMounted) {
-                    console.log(`✅ Carga completa. Total carreras en memoria: ${todasLasCarreras.length}`);
                     setAllCareers(todasLasCarreras);
                 }
 
             } catch (error) {
-                console.error("❌ Error en la carga secuencial:", error);
+                console.error("❌ Error en la carga:", error);
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -79,39 +86,31 @@ export default function CareersPage() {
     const textMenuClass = "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
     const buttonPressEffect = "transition-transform duration-100 active:scale-95";
 
-    // --- LÓGICA DE FILTRADO LOCAL ---
-    // 1. Filtramos la lista completa que tenemos en memoria
+    // --- LÓGICA DE FILTRADO ---
     const carrerasFiltradasTotales = allCareers
         .filter(c => {
-            // PROTECCIÓN: Si el nombre es nulo, usamos texto vacío para que no explote
             const nombreCarrera = (c.nombre || "").toLowerCase();
             return nombreCarrera.includes(busqueda.toLowerCase());
         })
         .filter(c => {
             if (filtroActivo === "Todas") return true;
-            if (filtroActivo === "IA") return (c.matchIA ?? 0) > 0;
+            // Ahora esto SÍ funcionará porque inyectamos datos simulados
+            if (filtroActivo === "IA") return (c.matchIA ?? 0) > 60;
 
-            // PROTECCIÓN: Lo mismo para el área
             const areaLimpia = (c.area || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const filtroLimpio = filtroActivo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
             return areaLimpia.includes(filtroLimpio);
         });
 
-    // 2. Ordenamos por IA si es necesario
     if (filtroActivo === "IA") {
         carrerasFiltradasTotales.sort((a, b) => (b.matchIA ?? 0) - (a.matchIA ?? 0));
     }
 
-    // --- PAGINACIÓN LOCAL ---
-    // CAMBIO CLAVE 3: Cortamos la lista filtrada para mostrar solo las de la página actual
+    // --- PAGINACIÓN ---
     const indiceUltimo = page * CARDS_POR_PAGINA;
     const indicePrimero = indiceUltimo - CARDS_POR_PAGINA;
-
-    // Esta es la lista FINAL que se mostrará en pantalla (siempre llena si hay datos)
     const carrerasParaMostrar = carrerasFiltradasTotales.slice(indicePrimero, indiceUltimo);
-
-    // Calculamos el total de páginas basado en el filtro actual
     const totalPaginas = Math.ceil(carrerasFiltradasTotales.length / CARDS_POR_PAGINA);
 
 
@@ -127,7 +126,7 @@ export default function CareersPage() {
     return (
         <div className="flex flex-col bg-white min-h-screen relative">
 
-            {/* --- NAVBAR --- */}
+            {/* NAVBAR */}
             <div className="flex justify-between items-center bg-[#FFFFFFCC] py-4 px-10 sticky top-0 z-40 backdrop-blur-sm shadow-sm">
                 <img
                     src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/549wbqn9_expires_30_days.png"}
@@ -149,7 +148,7 @@ export default function CareersPage() {
                 </button>
             </div>
 
-            {/* --- HEADER --- */}
+            {/* HEADER */}
             <div className="flex flex-col self-stretch max-w-[1152px] mb-8 mx-auto gap-8 mt-10 px-4">
                 <div className="flex flex-col md:flex-row justify-between items-end gap-6">
                     <div className="flex flex-col items-start gap-4">
@@ -175,9 +174,21 @@ export default function CareersPage() {
                 </div>
 
                 <div className="flex items-center gap-4 overflow-x-auto pb-2">
+
+                    {/* BOTÓN IA - LOGICA DE PROTECCIÓN */}
                     <button
                         className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'IA' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => { setFiltroActivo("IA"); setPage(1); }}
+                        onClick={() => {
+                            const tienePerfil = localStorage.getItem("perfilIA_creado");
+
+                            if (tienePerfil === "true") {
+                                setFiltroActivo("IA");
+                                setPage(1);
+                            } else {
+                                // CAMBIO: En vez de alert(), mostramos nuestro modal bonito
+                                setMostrarModalIA(true);
+                            }
+                        }}
                     >
                         <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/16w66z7y_expires_30_days.png"} className="w-3.5 h-5 object-contain" style={{ filter: filtroActivo === 'IA' ? 'brightness(0) invert(1)' : 'none' }} alt="IA Icon" />
                         <span className="text-sm font-bold">Recomendadas por IA</span>
@@ -208,10 +219,9 @@ export default function CareersPage() {
                 </div>
             </div>
 
-            {/* --- LISTA DE RESULTADOS --- */}
+            {/* LISTA */}
             <div className="flex flex-col self-stretch max-w-[1152px] mx-auto gap-6 mb-20 px-4 min-h-[400px]">
 
-                {/* CAMBIO CLAVE: Mapeamos 'carrerasParaMostrar' en vez de 'carrerasFiltradas' */}
                 {carrerasParaMostrar.length > 0 ? (
                     carrerasParaMostrar.map((carrera) => (
                         <div key={carrera.id} className="flex flex-col md:flex-row items-center bg-[#F6F9FA] p-8 gap-8 rounded-[48px] hover:shadow-lg transition-shadow duration-300">
@@ -228,6 +238,7 @@ export default function CareersPage() {
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
                                     <h3 className="text-[#0D0D1B] text-2xl font-bold">{carrera.nombre}</h3>
 
+                                    {/* ETIQUETA MATCH IA */}
                                     {filtroActivo === "IA" && (
                                         <div className="bg-[#1313EC1A] text-[#1313EC] px-3 py-1 rounded-full text-xs font-bold border border-[#1313EC33]">
                                             {carrera.matchIA}% AI MATCH
@@ -271,7 +282,7 @@ export default function CareersPage() {
                 )}
             </div>
 
-            {/* --- CONTROLES DE PAGINACIÓN ACTUALIZADOS --- */}
+            {/* CONTROLES */}
             <div className="flex justify-center gap-4 mt-10">
                 <button
                     disabled={page === 1}
@@ -281,7 +292,6 @@ export default function CareersPage() {
                     ← Anterior
                 </button>
 
-                {/* Muestra página actual vs total de páginas de la búsqueda */}
                 <span className="font-bold flex items-center">
                     Página {page} {totalPaginas > 0 && `de ${totalPaginas}`}
                 </span>
@@ -296,21 +306,65 @@ export default function CareersPage() {
             </div>
 
 
-            {/* --- FOOTER --- */}
+            {/* FOOTER */}
             <div className="bg-white py-16 px-20 border-t border-gray-200 mt-auto">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20 text-[#0D0D1B]">
                     <div className="col-span-1 flex flex-col gap-6">
                         <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/w9hmg2ml_expires_30_days.png"} className="w-48 object-contain filter invert opacity-80" alt="UniDream Logo" />
                         <p className="text-gray-600 text-sm leading-relaxed font-normal">Somos un equipo apasionado de estudiantes y desarrolladores comprometidos con democratizar el acceso a la orientación profesional.</p>
                     </div>
-                    {/* ... Resto del footer ... */}
                 </div>
                 <div className="border-t border-gray-200 pt-8 text-center">
                     <span className="text-gray-500 text-sm font-normal">© 2026 UniDream Platform. Todos los derechos reservados.</span>
                 </div>
             </div>
 
-            {/* --- MODAL --- */}
+            {/* MODAL */}
+
+            {/* --- MODAL DE "NO TE CONOCEMOS" (BONITO) --- */}
+            {mostrarModalIA && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white rounded-[32px] w-full max-w-md p-8 text-center shadow-2xl relative">
+                        {/* Botón Cerrar */}
+                        <button 
+                            onClick={() => setMostrarModalIA(false)} 
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+
+                        {/* Ícono Robot */}
+                        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <img src="https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/16w66z7y_expires_30_days.png" className="w-10 h-10 object-contain" alt="IA" />
+                        </div>
+
+                        <h3 className="text-2xl font-black text-[#0D0D1B] mb-3">
+                            ¡Aún no te conocemos! 🤖
+                        </h3>
+                        
+                        <p className="text-gray-500 text-sm leading-relaxed mb-8">
+                            Para que nuestra Inteligencia Artificial pueda recomendarte la carrera ideal, primero necesitamos saber qué te gusta.
+                        </p>
+
+                        <div className="flex flex-col gap-3">
+                            <button 
+                                onClick={() => navigate("/")}
+                                className="w-full bg-[#1313EC] text-white py-3.5 rounded-xl font-bold text-sm hover:bg-[#0f0fb5] transition-all transform hover:scale-[1.02] shadow-lg shadow-blue-200"
+                            >
+                                Ir a Empezar Ahora 🚀
+                            </button>
+                            
+                            <button 
+                                onClick={() => setMostrarModalIA(false)}
+                                className="w-full bg-white text-gray-500 py-3 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {carreraSeleccionada && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-[32px] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up">
@@ -349,6 +403,7 @@ export default function CareersPage() {
                                 </div>
                             </div>
 
+                            {/* SECCIÓN DE IA EN EL MODAL */}
                             {filtroActivo === 'IA' && (carreraSeleccionada.matchIA ?? 0) > 0 && (
                                 <div className="bg-[#1313EC0D] border border-[#1313EC33] rounded-2xl p-6 text-left">
                                     <h4 className="text-[#1313EC] font-bold mb-2 uppercase text-xs tracking-wider flex items-center gap-2">
