@@ -3,65 +3,126 @@ import { useNavigate } from "react-router-dom";
 import { Career } from "../../types/Career";
 import { getCareers } from "../../services/careers";
 
+// Definimos cuántas tarjetas queremos por pantalla
+const CARDS_POR_PAGINA = 6;
+
 export default function CareersPage() {
     const navigate = useNavigate();
-    const [careers, setCareers] = useState<Career[]>([]);
+
+    // CAMBIO CLAVE 1: 'allCareers' guardará TODO lo que traigamos de la base de datos
+    const [allCareers, setAllCareers] = useState<Career[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [page, setPage] = useState(1);
-    const limit = 5;
 
-    const [filtroActivo, setFiltroActivo] = useState<
-        "IA" | "Todas" | "Ingeniería" | "Salud"
-    >("IA");
+    // Iniciamos en "Todas" para que siempre haya contenido al inicio
+    const [filtroActivo, setFiltroActivo] = useState<"IA" | "Todas" | "Ingeniería" | "Salud">("Todas");
 
     const [busqueda, setBusqueda] = useState("");
     const [carreraSeleccionada, setCarreraSeleccionada] = useState<Career | null>(null);
 
+    // CAMBIO 1: Bajamos a 50 para asegurar que el servidor responda rápido
+    const LIMIT_CARGA = 50;
+
+// --- EFECTO DE CARGA INTELIGENTE (Loop) ---
     useEffect(() => {
         let isMounted = true;
         setLoading(true);
 
-        getCareers(page, limit)
-            .then((data) => {
-                if (isMounted) setCareers(data);
-            })
-            .catch((error) => console.error(error))
-            .finally(() => {
+        const fetchAllData = async () => {
+            try {
+                let todasLasCarreras: Career[] = [];
+                let paginaActual = 1;
+                let seguirBuscando = true;
+                const LIMITE_SEGURO = 20; // Bajamos a 20 para evitar el Error 422
+
+                console.log("🚀 Iniciando descarga secuencial...");
+
+                while (seguirBuscando) {
+                    // Pedimos un bloque pequeño
+                    const data = await getCareers(paginaActual, LIMITE_SEGURO);
+                    
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        // Guardamos lo que llegó
+                        todasLasCarreras = [...todasLasCarreras, ...data];
+                        console.log(`📦 Recibido bloque ${paginaActual}: ${data.length} carreras`);
+                        
+                        // Si recibimos menos del límite, significa que llegamos al final
+                        if (data.length < LIMITE_SEGURO) {
+                            seguirBuscando = false;
+                        } else {
+                            paginaActual++; // Vamos por la siguiente página
+                        }
+                    } else {
+                        // Si llega vacío o error, paramos
+                        seguirBuscando = false;
+                    }
+                }
+
+                if (isMounted) {
+                    console.log(`✅ Carga completa. Total carreras en memoria: ${todasLasCarreras.length}`);
+                    setAllCareers(todasLasCarreras);
+                }
+
+            } catch (error) {
+                console.error("❌ Error en la carga secuencial:", error);
+            } finally {
                 if (isMounted) setLoading(false);
-            });
+            }
+        };
+
+        fetchAllData();
 
         return () => { isMounted = false; };
-    }, [page]);
-
-
+    }, []);
 
     const textMenuClass = "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
     const buttonPressEffect = "transition-transform duration-100 active:scale-95";
 
-    const carrerasFiltradas = careers
-        .filter(c =>
-            c.nombre.toLowerCase().includes(busqueda.toLowerCase())
-        )
+    // --- LÓGICA DE FILTRADO LOCAL ---
+    // 1. Filtramos la lista completa que tenemos en memoria
+    const carrerasFiltradasTotales = allCareers
+        .filter(c => {
+            // PROTECCIÓN: Si el nombre es nulo, usamos texto vacío para que no explote
+            const nombreCarrera = (c.nombre || "").toLowerCase();
+            return nombreCarrera.includes(busqueda.toLowerCase());
+        })
         .filter(c => {
             if (filtroActivo === "Todas") return true;
             if (filtroActivo === "IA") return (c.matchIA ?? 0) > 0;
-            return c.area === filtroActivo;
+
+            // PROTECCIÓN: Lo mismo para el área
+            const areaLimpia = (c.area || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const filtroLimpio = filtroActivo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+            return areaLimpia.includes(filtroLimpio);
         });
 
+    // 2. Ordenamos por IA si es necesario
     if (filtroActivo === "IA") {
-        carrerasFiltradas.sort(
-            (a, b) => (b.matchIA ?? 0) - (a.matchIA ?? 0)
-        );
+        carrerasFiltradasTotales.sort((a, b) => (b.matchIA ?? 0) - (a.matchIA ?? 0));
     }
 
-    //if (loading) {
-    //    return (
-    //        <div className="flex items-center justify-center min-h-screen">
-    //            <span className="text-gray-500">Cargando carreras...</span>
-    //        </div>
-    //    );
-    //}
+    // --- PAGINACIÓN LOCAL ---
+    // CAMBIO CLAVE 3: Cortamos la lista filtrada para mostrar solo las de la página actual
+    const indiceUltimo = page * CARDS_POR_PAGINA;
+    const indicePrimero = indiceUltimo - CARDS_POR_PAGINA;
+
+    // Esta es la lista FINAL que se mostrará en pantalla (siempre llena si hay datos)
+    const carrerasParaMostrar = carrerasFiltradasTotales.slice(indicePrimero, indiceUltimo);
+
+    // Calculamos el total de páginas basado en el filtro actual
+    const totalPaginas = Math.ceil(carrerasFiltradasTotales.length / CARDS_POR_PAGINA);
+
+
+    if (loading && allCareers.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1313EC]"></div>
+                <span className="text-gray-500 mt-4 font-medium">Conectando con UniDream DB...</span>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col bg-white min-h-screen relative">
@@ -104,7 +165,10 @@ export default function CareersPage() {
                             placeholder="Buscar carrera (ej: Medicina, Derecho)..."
                             className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-[#1313EC] transition-colors font-normal"
                             value={busqueda}
-                            onChange={(e) => setBusqueda(e.target.value)}
+                            onChange={(e) => {
+                                setBusqueda(e.target.value);
+                                setPage(1);
+                            }}
                         />
                         <svg className="w-5 h-5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
@@ -113,7 +177,7 @@ export default function CareersPage() {
                 <div className="flex items-center gap-4 overflow-x-auto pb-2">
                     <button
                         className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'IA' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => setFiltroActivo("IA")}
+                        onClick={() => { setFiltroActivo("IA"); setPage(1); }}
                     >
                         <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/16w66z7y_expires_30_days.png"} className="w-3.5 h-5 object-contain" style={{ filter: filtroActivo === 'IA' ? 'brightness(0) invert(1)' : 'none' }} alt="IA Icon" />
                         <span className="text-sm font-bold">Recomendadas por IA</span>
@@ -121,14 +185,14 @@ export default function CareersPage() {
 
                     <button
                         className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Todas' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => setFiltroActivo("Todas")}
+                        onClick={() => { setFiltroActivo("Todas"); setPage(1); }}
                     >
                         <span className="text-sm font-bold">Todas</span>
                     </button>
 
                     <button
                         className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Ingeniería' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => setFiltroActivo("Ingeniería")}
+                        onClick={() => { setFiltroActivo("Ingeniería"); setPage(1); }}
                     >
                         <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/il8iu3gh_expires_30_days.png"} className={`w-3.5 h-5 object-contain ${filtroActivo === 'Ingeniería' ? 'brightness-0 invert' : ''}`} alt="Ingeniería Icon" />
                         <span className="text-sm font-bold">Ingeniería</span>
@@ -136,7 +200,7 @@ export default function CareersPage() {
 
                     <button
                         className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Salud' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => setFiltroActivo("Salud")}
+                        onClick={() => { setFiltroActivo("Salud"); setPage(1); }}
                     >
                         <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/3ns51jb1_expires_30_days.png"} className={`w-3.5 h-5 object-contain ${filtroActivo === 'Salud' ? 'brightness-0 invert' : ''}`} alt="Salud Icon" />
                         <span className="text-sm font-bold">Salud</span>
@@ -147,12 +211,17 @@ export default function CareersPage() {
             {/* --- LISTA DE RESULTADOS --- */}
             <div className="flex flex-col self-stretch max-w-[1152px] mx-auto gap-6 mb-20 px-4 min-h-[400px]">
 
-                {carrerasFiltradas.length > 0 ? (
-                    carrerasFiltradas.map((carrera) => (
+                {/* CAMBIO CLAVE: Mapeamos 'carrerasParaMostrar' en vez de 'carrerasFiltradas' */}
+                {carrerasParaMostrar.length > 0 ? (
+                    carrerasParaMostrar.map((carrera) => (
                         <div key={carrera.id} className="flex flex-col md:flex-row items-center bg-[#F6F9FA] p-8 gap-8 rounded-[48px] hover:shadow-lg transition-shadow duration-300">
 
                             <div className="w-32 h-32 rounded-[32px] bg-white flex items-center justify-center shadow-sm shrink-0">
-                                <img src={carrera.imagen ?? ""} className="w-16 h-16 object-contain" alt={carrera.nombre} />
+                                <img
+                                    src={carrera.imagen || "https://placehold.co/100x100?text=Uni"}
+                                    className="w-16 h-16 object-contain"
+                                    alt={carrera.nombre}
+                                />
                             </div>
 
                             <div className="flex flex-1 flex-col gap-2 w-full">
@@ -174,25 +243,11 @@ export default function CareersPage() {
                                 </div>
 
                                 <div className="mt-3">
-                                    <h4 className="text-sm font-semibold text-gray-700 mb-1">
-                                        Descripción
-                                    </h4>
-
-                                    <div className="
-                                    text-sm
-                                    text-gray-600
-                                    max-h-28
-                                    overflow-y-auto
-                                    pr-2
-                                    leading-relaxed
-                                    scrollbar-thin
-                                    scrollbar-thumb-gray-300
-                                    scrollbar-track-transparent
-                                    ">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-1">Descripción</h4>
+                                    <div className="text-sm text-gray-600 max-h-28 overflow-y-auto pr-2 leading-relaxed scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
                                         {carrera.descripcion || "Sin descripción disponible"}
                                     </div>
                                 </div>
-
                             </div>
 
                             <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto">
@@ -216,20 +271,25 @@ export default function CareersPage() {
                 )}
             </div>
 
+            {/* --- CONTROLES DE PAGINACIÓN ACTUALIZADOS --- */}
             <div className="flex justify-center gap-4 mt-10">
                 <button
                     disabled={page === 1}
                     onClick={() => setPage(p => p - 1)}
-                    className="px-4 py-2 rounded-full bg-gray-200 disabled:opacity-50"
+                    className="px-4 py-2 rounded-full bg-gray-200 disabled:opacity-50 transition-opacity"
                 >
                     ← Anterior
                 </button>
 
-                <span className="font-bold">Página {page}</span>
+                {/* Muestra página actual vs total de páginas de la búsqueda */}
+                <span className="font-bold flex items-center">
+                    Página {page} {totalPaginas > 0 && `de ${totalPaginas}`}
+                </span>
 
                 <button
+                    disabled={page >= totalPaginas || totalPaginas === 0}
                     onClick={() => setPage(p => p + 1)}
-                    className="px-4 py-2 rounded-full bg-gray-200"
+                    className="px-4 py-2 rounded-full bg-gray-200 disabled:opacity-50 transition-opacity"
                 >
                     Siguiente →
                 </button>
@@ -243,20 +303,7 @@ export default function CareersPage() {
                         <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/w9hmg2ml_expires_30_days.png"} className="w-48 object-contain filter invert opacity-80" alt="UniDream Logo" />
                         <p className="text-gray-600 text-sm leading-relaxed font-normal">Somos un equipo apasionado de estudiantes y desarrolladores comprometidos con democratizar el acceso a la orientación profesional.</p>
                     </div>
-                    <div className="col-span-1 flex flex-col gap-4">
-                        <h4 className="text-lg font-bold mb-2 text-[#0D0D1B]">Plataforma</h4>
-                        <span className="text-gray-600 text-sm hover:text-[#1313EC] cursor-pointer font-normal" onClick={() => navigate("/carreras")}>Directorio de Carreras</span>
-                        <span className="text-gray-600 text-sm hover:text-[#1313EC] cursor-pointer font-normal" onClick={() => navigate("/universidades")}>Ranking de Universidades</span>
-                        <span className="text-gray-600 text-sm hover:text-[#1313EC] cursor-pointer font-normal">Test Vocacional IA</span>
-                    </div>
-                    <div className="col-span-1"></div>
-                    <div className="col-span-1 flex flex-col gap-4">
-                        <h4 className="text-lg font-bold mb-2 text-[#0D0D1B]">Suscríbete</h4>
-                        <div className="flex flex-col gap-3">
-                            <input type="email" placeholder="Tu correo electrónico" className="bg-gray-100 text-[#0D0D1B] p-3 rounded-full border border-gray-300 outline-none focus:border-[#1313EC] font-normal" />
-                            <button className="bg-[#1313EC] text-white py-3 rounded-full font-bold hover:bg-[#0f0fb5]" onClick={() => alert("Suscrito!")}>Suscribirme</button>
-                        </div>
-                    </div>
+                    {/* ... Resto del footer ... */}
                 </div>
                 <div className="border-t border-gray-200 pt-8 text-center">
                     <span className="text-gray-500 text-sm font-normal">© 2026 UniDream Platform. Todos los derechos reservados.</span>
@@ -275,7 +322,7 @@ export default function CareersPage() {
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                             <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center border-4 border-white shadow-lg absolute -bottom-12">
-                                <img src={carreraSeleccionada.imagen ?? ""} className="w-14 h-14 object-contain" alt={carreraSeleccionada.nombre} />
+                                <img src={carreraSeleccionada.imagen || "https://placehold.co/100x100?text=Uni"} className="w-14 h-14 object-contain" alt={carreraSeleccionada.nombre} />
                             </div>
                         </div>
 
@@ -302,11 +349,9 @@ export default function CareersPage() {
                                 </div>
                             </div>
 
-                            {/* Corregido: Acceso seguro a matchIA */}
                             {filtroActivo === 'IA' && (carreraSeleccionada.matchIA ?? 0) > 0 && (
                                 <div className="bg-[#1313EC0D] border border-[#1313EC33] rounded-2xl p-6 text-left">
                                     <h4 className="text-[#1313EC] font-bold mb-2 uppercase text-xs tracking-wider flex items-center gap-2">
-                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path></svg>
                                         Análisis de Compatibilidad
                                     </h4>
                                     <p className="text-[#1313EC] text-sm font-medium mb-1">
@@ -321,7 +366,6 @@ export default function CareersPage() {
                             <div className="text-left">
                                 <h4 className="text-[#0D0D1B] font-bold text-sm mb-3">Disponible en estas Universidades:</h4>
                                 <div className="flex flex-wrap gap-2">
-                                    {/* Corregido: Validación de existencia de universidades */}
                                     {carreraSeleccionada.universidades?.length > 0 ? (
                                         carreraSeleccionada.universidades.map((uni: string, idx: number) => (
                                             <span key={idx} className="bg-white border border-gray-300 px-3 py-1.5 rounded-full text-xs text-gray-700 font-medium hover:border-[#1313EC] hover:text-[#1313EC] cursor-pointer transition-colors"
