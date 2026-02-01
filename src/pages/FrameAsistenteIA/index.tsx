@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getUserId } from "../../services/session";
 import { resetUserSession } from "../../services/session";
 import { chatStream } from "../../services/api";
+import { nanoid } from 'nanoid';
+
 
 const userId = getUserId();
 // 1. IMPORTAMOS LA FUNCIÓN DEL MESERO (API)
@@ -26,7 +28,7 @@ export default () => {
 
     const [messages, setMessages] = useState<Message[]>([
         {
-            id: crypto.randomUUID(),
+            id: nanoid(), // reemplaza crypto.randomUUID()
             sender: "bot",
             text: "Estoy listo para ayudarte 😊"
         }

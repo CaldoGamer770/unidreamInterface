@@ -1,7 +1,9 @@
+import { nanoid } from 'nanoid';
+
 export function getUserId(): string {
     let userId = localStorage.getItem("userId");
     if (!userId) {
-        userId = crypto.randomUUID(); // Genera un ID único
+        userId = nanoid(); // Genera un ID único seguro y compatible
         localStorage.setItem("userId", userId);
     }
     return userId;
