@@ -12,3 +12,7 @@ export function getUserId(): string {
 export const resetUserSession = () => {
     localStorage.removeItem("userId");
 };
+<<<<<<< HEAD
+=======
+
+>>>>>>> f658378b2bd08c94a854da4fd4ad426b3626232d

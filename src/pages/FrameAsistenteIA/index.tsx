@@ -4,7 +4,10 @@ import { getUserId } from "../../services/session";
 import { resetUserSession } from "../../services/session";
 import { chatStream } from "../../services/api";
 import { nanoid } from 'nanoid';
+<<<<<<< HEAD
 
+=======
+>>>>>>> f658378b2bd08c94a854da4fd4ad426b3626232d
 
 const userId = getUserId();
 // 1. IMPORTAMOS LA FUNCIÓN DEL MESERO (API)
@@ -28,7 +31,11 @@ export default () => {
 
     const [messages, setMessages] = useState<Message[]>([
         {
+<<<<<<< HEAD
             id: nanoid(), // reemplaza crypto.randomUUID()
+=======
+            id: nanoid(),
+>>>>>>> f658378b2bd08c94a854da4fd4ad426b3626232d
             sender: "bot",
             text: "Estoy listo para ayudarte 😊"
         }
@@ -49,7 +56,7 @@ export default () => {
         const userText = inputValue;
 
         const newUserMsg: Message = {
-            id: crypto.randomUUID(),
+            id: nanoid(),
             text: userText,
             sender: "user"
         };
@@ -60,7 +67,7 @@ export default () => {
 
         // Creamos y agregamos el mensaje del bot vacío
         const botMsg: Message = {
-            id: crypto.randomUUID(),
+            id: nanoid(),
             text: "",
             sender: "bot"
         };
@@ -89,7 +96,7 @@ export default () => {
             setMessages(prev => [
                 ...prev,
                 {
-                    id: crypto.randomUUID(),
+                    id: nanoid(),
                     sender: "bot",
                     text: "Error de conexión, intenta de nuevo."
                 }
