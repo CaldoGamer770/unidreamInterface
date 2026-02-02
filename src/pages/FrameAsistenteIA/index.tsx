@@ -169,7 +169,8 @@ export default () => {
 
                 <div className="flex flex-col w-full max-w-[900px] h-[600px] bg-white rounded-[48px] border border-black overflow-hidden shadow-2xl relative">
                     <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-6">
-                        {messages.map((msg) => (
+                        {/* Solo mostramos los mensajes si no está cargando */}
+                        {!isLoading && messages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`flex gap-4 max-w-[80%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                                     {msg.sender === 'bot' && (
@@ -188,8 +189,8 @@ export default () => {
                             </div>
                         ))}
 
-                        {/* INDICADOR DE CARGA - solo se muestra cuando isLoading es true */}
-                        {isLoading && messages.length > 0 && messages[messages.length - 1].sender === 'bot' && (
+                        {/* Solo mostramos el indicador de carga si está cargando y el último mensaje es del bot */}
+                        {isLoading && (
                             <div className="flex justify-start">
                                 <div className="flex gap-4 max-w-[80%] flex-row">
                                     <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
@@ -204,6 +205,7 @@ export default () => {
 
                         <div ref={messagesEndRef} />
                     </div>
+
 
 
 
