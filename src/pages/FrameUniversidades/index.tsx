@@ -1,190 +1,230 @@
-import React, { useState } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getUniversities, University } from "../../services/universities"; 
 
-const universidadesData = [
+const CARDS_POR_PAGINA = 5;
+
+// --- DATOS DE RESPALDO (Por si AWS falla) ---
+const UNIVERSIDADES_MOCK: University[] = [
     {
         id: 1,
-        nombre: "Universidad Nacional de Tecnología",
-        tipo: "Publica",
-        imagen: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/qyxjr5s3_expires_30_days.png",
+        nombre: "Universidad Central del Ecuador",
+        tipo: "Pública",
+        imagen: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Escudo_de_la_Universidad_Central_del_Ecuador.svg/1200px-Escudo_de_la_Universidad_Central_del_Ecuador.svg.png",
         ubicacion: "Quito, Pichincha",
-        descripcion: "Líder en investigación tecnológica con más de 45 programas de ingeniería y convenios internacionales.",
+        descripcion: "La universidad más antigua y grande del Ecuador, líder en investigación y ciencias sociales.",
         matchIA: 98,
-        carreraSugeridaIA: "Ingeniería de Software",
-        facultades: ["Ingeniería", "Ciencias Exactas", "Mecatrónica"],
-        url: "https://www.epn.edu.ec"
+        url: "https://www.uce.edu.ec"
     },
     {
         id: 2,
-        nombre: "Instituto de Artes y Ciencias",
-        tipo: "Privada",
-        imagen: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/e7larkph_expires_30_days.png",
-        ubicacion: "Guayaquil, Guayas",
-        descripcion: "Enfocado en el desarrollo creativo y pensamiento crítico. Ofrece programas exclusivos en Diseño.",
-        matchIA: 85,
-        carreraSugeridaIA: "Diseño Gráfico",
-        facultades: ["Artes", "Arquitectura", "Humanidades"],
-        url: "https://www.uartes.edu.ec"
+        nombre: "Escuela Politécnica Nacional",
+        tipo: "Pública",
+        imagen: "https://www.epn.edu.ec/wp-content/uploads/2015/06/logo-epn.png",
+        ubicacion: "Quito, Pichincha",
+        descripcion: "Referente nacional en carreras de ingeniería, ciencias exactas y tecnología.",
+        matchIA: 95,
+        url: "https://www.epn.edu.ec"
     },
     {
         id: 3,
-        nombre: "Universidad Metropolitana de Innovación",
+        nombre: "Universidad San Francisco de Quito",
         tipo: "Privada",
-        imagen: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/aw1r5zfw_expires_30_days.png",
-        ubicacion: "Cuenca, Azuay",
-        descripcion: "Pioneros en el modelo educativo de aprendizaje basado en retos. Especialización en negocios.",
-        matchIA: 70,
-        carreraSugeridaIA: "Administración de Empresas",
-        facultades: ["Negocios", "Economía", "Marketing"],
-        url: "https://www.uda.edu.ec"
+        imagen: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Logo_USFQ.svg/1200px-Logo_USFQ.svg.png",
+        ubicacion: "Cumbayá, Quito",
+        descripcion: "Institución de artes liberales reconocida por su innovación y campus internacional.",
+        matchIA: 88,
+        url: "https://www.usfq.edu.ec"
+    },
+    {
+        id: 4,
+        nombre: "Pontificia Universidad Católica del Ecuador",
+        tipo: "Privada",
+        imagen: "https://upload.wikimedia.org/wikipedia/commons/eb/e3/Logo_PUCE.png",
+        ubicacion: "Quito, Pichincha",
+        descripcion: "Excelencia académica con enfoque humanista y gran trayectoria en medicina y derecho.",
+        matchIA: 85,
+        url: "https://www.puce.edu.ec"
+    },
+    {
+        id: 5,
+        nombre: "Universidad de las Fuerzas Armadas ESPE",
+        tipo: "Pública",
+        imagen: "https://upload.wikimedia.org/wikipedia/commons/2/22/Logo_ESPE.png",
+        ubicacion: "Sangolquí, Pichincha",
+        descripcion: "Prestigiosa en áreas técnicas, militares y de seguridad.",
+        matchIA: 80,
+        url: "https://www.espe.edu.ec"
     }
 ];
 
-export default () => {
+export default function UniversitiesPage() {
     const navigate = useNavigate();
-    const [filtroActivo, setFiltroActivo] = useState<"IA" | "Publica" | "Privada">("IA");
-    const [busqueda, setBusqueda] = useState("");
-    const [universidadSeleccionada, setUniversidadSeleccionada] = useState<any>(null);
 
-    // Menú: font-medium
+    const [allUniversities, setAllUniversities] = useState<University[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+
+    // Filtro inicial en "Todas" para ver resultados de inmediato
+    const [filtroActivo, setFiltroActivo] = useState<"IA" | "Todas" | "Publica" | "Privada">("Todas");
+    const [busqueda, setBusqueda] = useState("");
+    const [universidadSeleccionada, setUniversidadSeleccionada] = useState<University | null>(null);
+
+    // --- EFECTO DE CARGA HÍBRIDA ---
+    useEffect(() => {
+        let isMounted = true;
+        setLoading(true);
+
+        const fetchAllData = async () => {
+            try {
+                // Intentamos conectar a AWS
+                console.log("📡 Intentando conectar a AWS...");
+                const data = await getUniversities(1, 20); // Prueba inicial
+
+                if (isMounted) {
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        console.log("✅ Conexión exitosa con AWS");
+                        setAllUniversities(data);
+                    } else {
+                        throw new Error("Respuesta vacía"); // Forzamos el error para usar el backup
+                    }
+                }
+            } catch (error) {
+                console.warn("⚠️ AWS no disponible o sin datos. Usando RESPALDO LOCAL.");
+                if (isMounted) {
+                    // AQUÍ ESTÁ LA MAGIA: Si falla, cargamos los datos de prueba
+                    setAllUniversities(UNIVERSIDADES_MOCK);
+                }
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchAllData();
+        return () => { isMounted = false; };
+    }, []);
+
+    // --- FILTRADO LOCAL ---
+    const universidadesFiltradas = allUniversities
+        .filter(uni => (uni.nombre || "").toLowerCase().includes(busqueda.toLowerCase()))
+        .filter(uni => {
+            if (filtroActivo === "Todas") return true;
+            if (filtroActivo === "IA") return (uni.matchIA ?? 0) > 0;
+            
+            const tipoNormalizado = (uni.tipo || uni.descripcion || "").toLowerCase();
+            
+            // Ajustamos para que coincida con tus datos Mock ("Pública", "Privada")
+            if (filtroActivo === "Publica") return tipoNormalizado.includes("pública") || tipoNormalizado.includes("publica");
+            if (filtroActivo === "Privada") return tipoNormalizado.includes("privada");
+            
+            return true;
+        });
+
+    if (filtroActivo === "IA") {
+        universidadesFiltradas.sort((a, b) => (b.matchIA ?? 0) - (a.matchIA ?? 0));
+    }
+
+    // --- PAGINACIÓN ---
+    const indiceUltimo = page * CARDS_POR_PAGINA;
+    const indicePrimero = indiceUltimo - CARDS_POR_PAGINA;
+    const unisParaMostrar = universidadesFiltradas.slice(indicePrimero, indiceUltimo);
+    const totalPaginas = Math.ceil(universidadesFiltradas.length / CARDS_POR_PAGINA);
+
     const textMenuClass = "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
     const buttonPressEffect = "transition-transform duration-100 active:scale-95";
 
-    const universidadesFiltradas = universidadesData.filter(uni => {
-        const coincideBusqueda = uni.nombre.toLowerCase().includes(busqueda.toLowerCase());
-        let coincideCategoria = true;
-        if (filtroActivo === "IA") {
-            coincideCategoria = true; 
-        } else {
-            coincideCategoria = uni.tipo === filtroActivo;
-        }
-        return coincideBusqueda && coincideCategoria;
-    });
-
-    if (filtroActivo === "IA") {
-        universidadesFiltradas.sort((a, b) => b.matchIA - a.matchIA);
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1313EC]"></div>
+                <span className="text-gray-500 mt-4">Cargando Universidades...</span>
+            </div>
+        );
     }
 
     return (
         <div className="flex flex-col bg-white min-h-screen relative">
             
-            {/* --- NAVBAR --- */}
+            {/* NAVBAR */}
             <div className="flex justify-between items-center bg-[#FFFFFFCC] py-4 px-10 sticky top-0 z-40 backdrop-blur-sm shadow-sm">
-                <img
-                    src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/549wbqn9_expires_30_days.png"}
-                    className="w-[148px] h-[42px] object-contain cursor-pointer"
-                    onClick={() => navigate("/")}
-                    alt="UniDream Logo"
-                />
+                <img src="https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/549wbqn9_expires_30_days.png" className="w-[148px] h-[42px] object-contain cursor-pointer" onClick={() => navigate("/")} alt="Logo" />
                 <div className="flex-1 flex justify-center items-center gap-12">
                     <span onClick={() => navigate("/")} className={textMenuClass}>Inicio</span>
                     <span onClick={() => navigate("/carreras")} className={textMenuClass}>Carreras</span>
-                    {/* Botón activo: font-bold para resaltar */}
                     <span onClick={() => navigate("/universidades")} className={`${textMenuClass} text-[#1313EC] font-bold`}>Universidades</span>
                 </div>
-                <button 
-                    className={`flex items-center gap-2 bg-[#1313EC] py-2.5 px-6 rounded-full border-0 ${buttonPressEffect}`}
-                    style={{ boxShadow: "0px 4px 6px #1313EC33" }}
-                    onClick={() => navigate("/asistente")}
-                >
+                <button className={`flex items-center gap-2 bg-[#1313EC] py-2.5 px-6 rounded-full border-0 ${buttonPressEffect}`} onClick={() => navigate("/asistente")}>
                     <span className="text-white text-sm font-bold">Asistente IA</span>
                 </button>
             </div>
 
-            {/* --- HEADER --- */}
+            {/* HEADER */}
             <div className="flex flex-col self-stretch max-w-[1152px] mb-8 mx-auto gap-8 mt-10 px-4">
                 <div className="flex flex-col md:flex-row justify-between items-end gap-6">
                     <div className="flex flex-col items-start gap-4">
-                        {/* Título Principal: font-black */}
                         <span className="text-[#0D0D1B] text-5xl font-black">Explora Universidades</span>
                         <span className="text-[#4C4C9A] text-lg max-w-[628px] font-normal">
-                            Utilizamos inteligencia artificial para analizar programas académicos y encontrar la institución que mejor se alinea con tus metas.
+                            Encuentra la institución ideal. {allUniversities === UNIVERSIDADES_MOCK && "(Modo Offline activo)"}
                         </span>
                     </div>
-                    
                     <div className="relative w-full md:w-96">
                         <input 
                             type="text" 
                             placeholder="Buscar universidad..." 
-                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-[#1313EC] transition-colors font-normal"
+                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-[#1313EC]"
                             value={busqueda}
-                            onChange={(e) => setBusqueda(e.target.value)}
+                            onChange={(e) => { setBusqueda(e.target.value); setPage(1); }}
                         />
                         <svg className="w-5 h-5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-4 overflow-x-auto pb-2">
-                    {/* Botones filtro: font-medium o font-bold */}
-                    <button 
-                        className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'IA' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => setFiltroActivo("IA")}
-                    >
-                        <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/16w66z7y_expires_30_days.png"} className="w-3.5 h-5 object-contain filter brightness-0 invert" style={{ filter: filtroActivo === 'IA' ? 'brightness(0) invert(1)' : 'none' }} />
-                        <span className="text-sm font-bold">Recomendadas por IA</span>
+                    <button className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'IA' ? 'bg-[#1313EC] text-white border-transparent' : 'bg-white text-[#0D0D1B] border-[#E7E7F3]'}`} onClick={() => { setFiltroActivo("IA"); setPage(1); }}>
+                        <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/16w66z7y_expires_30_days.png"} className="w-3.5 h-5 object-contain" style={{ filter: filtroActivo === 'IA' ? 'brightness(0) invert(1)' : 'none' }} alt="IA" />
+                        <span className="text-sm font-bold ml-2">Recomendadas por IA</span>
                     </button>
-
-                    <button 
-                        className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Publica' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => setFiltroActivo("Publica")}
-                    >
+                    <button className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Todas' ? 'bg-[#1313EC] text-white border-transparent' : 'bg-white text-[#0D0D1B] border-[#E7E7F3]'}`} onClick={() => { setFiltroActivo("Todas"); setPage(1); }}>
+                        <span className="text-sm font-bold">Todas</span>
+                    </button>
+                    <button className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Publica' ? 'bg-[#1313EC] text-white border-transparent' : 'bg-white text-[#0D0D1B] border-[#E7E7F3]'}`} onClick={() => { setFiltroActivo("Publica"); setPage(1); }}>
                         <span className="text-sm font-bold">Públicas</span>
                     </button>
-
-                    <button 
-                        className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Privada' ? 'bg-[#1313EC] text-white border-transparent shadow-md' : 'bg-white text-[#0D0D1B] border-[#E7E7F3] hover:bg-gray-50'}`}
-                        onClick={() => setFiltroActivo("Privada")}
-                    >
+                    <button className={`flex shrink-0 items-center py-[9px] px-5 gap-2 rounded-full border transition-all ${filtroActivo === 'Privada' ? 'bg-[#1313EC] text-white border-transparent' : 'bg-white text-[#0D0D1B] border-[#E7E7F3]'}`} onClick={() => { setFiltroActivo("Privada"); setPage(1); }}>
                         <span className="text-sm font-bold">Privadas</span>
                     </button>
                 </div>
             </div>
 
-            {/* --- LISTA DE RESULTADOS --- */}
+            {/* LISTA */}
             <div className="flex flex-col self-stretch max-w-[1152px] mx-auto gap-6 mb-20 px-4 min-h-[400px]">
-                
-                {universidadesFiltradas.length > 0 ? (
-                    universidadesFiltradas.map((uni) => (
+                {unisParaMostrar.length > 0 ? (
+                    unisParaMostrar.map((uni) => (
                         <div key={uni.id} className="flex flex-col md:flex-row items-center bg-[#F6F9FA] p-8 gap-8 rounded-[48px] hover:shadow-lg transition-shadow duration-300">
-                            <img src={uni.imagen} className="w-32 h-32 rounded-3xl object-cover bg-white shadow-sm" alt={uni.nombre}/>
+                            <div className="w-32 h-32 rounded-[32px] bg-white flex items-center justify-center shadow-sm shrink-0 p-2 overflow-hidden">
+                                <img src={uni.imagen || "https://placehold.co/100x100?text=U"} className="w-full h-full object-contain" alt={uni.nombre} />
+                            </div>
                             
                             <div className="flex flex-1 flex-col gap-2 w-full">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                                    {/* Nombre Universidad: font-bold */}
                                     <h3 className="text-[#0D0D1B] text-2xl font-bold">{uni.nombre}</h3>
-                                    
                                     {filtroActivo === "IA" && (
                                         <div className="bg-[#1313EC1A] text-[#1313EC] px-3 py-1 rounded-full text-xs font-bold border border-[#1313EC33]">
                                             {uni.matchIA}% AI MATCH
                                         </div>
                                     )}
                                 </div>
-                                
                                 <div className="flex flex-col gap-1">
-                                    {/* Ubicación: font-medium */}
                                     <span className="text-[#4C4C9A] text-sm font-medium">{uni.ubicacion}</span>
-                                    {filtroActivo === "IA" ? (
-                                         <span className="text-[#1313EC] text-base font-medium">
-                                            Carrera sugerida: <span className="font-bold">{uni.carreraSugeridaIA}</span>
-                                         </span>
-                                    ) : (
-                                        <span className="text-gray-500 text-sm font-normal">
-                                            {uni.tipo === "Publica" ? "Institución Pública" : "Institución Privada"}
-                                        </span>
-                                    )}
+                                    <span className="text-gray-500 text-sm">{uni.tipo}</span>
                                 </div>
-
-                                {/* Descripción: font-normal */}
-                                <p className="text-[#4C4C9A] text-sm leading-relaxed max-w-2xl font-normal">
+                                <p className="text-[#4C4C9A] text-sm leading-relaxed max-w-2xl font-normal line-clamp-2">
                                     {uni.descripcion}
                                 </p>
                             </div>
 
                             <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto">
-                                <button 
-                                    className={`bg-[#1313EC] text-white py-3 px-8 rounded-full font-bold hover:bg-[#0f0fb5] transition-colors ${buttonPressEffect}`}
-                                    onClick={() => setUniversidadSeleccionada(uni)}
-                                >
+                                <button className={`bg-[#1313EC] text-white py-3 px-8 rounded-full font-bold hover:bg-[#0f0fb5] transition-colors ${buttonPressEffect}`} onClick={() => setUniversidadSeleccionada(uni)}>
                                     Ver Detalles
                                 </button>
                             </div>
@@ -192,116 +232,38 @@ export default () => {
                     ))
                 ) : (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="bg-gray-100 p-6 rounded-full mb-4">
-                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900">Esta universidad no está registrada</h3>
-                        <p className="text-gray-500 mt-2 font-normal">Intenta buscar con otro nombre o revisa la ortografía.</p>
+                        <h3 className="text-xl font-bold text-gray-900">No encontramos universidades</h3>
+                        <p className="text-gray-500 mt-2">Prueba cambiando el filtro.</p>
                     </div>
                 )}
 
-                {universidadesFiltradas.length > 0 && (
-                    <div className="flex justify-center mt-8">
-                        <button className="flex items-center gap-2 px-6 py-3 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
-                            <span className="text-[#0D0D1B] font-bold">Cargar más universidades</span>
-                        </button>
-                    </div>
-                )}
+                {/* PAGINACIÓN */}
+                <div className="flex justify-center gap-4 mt-8">
+                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-4 py-2 rounded-full bg-gray-200 disabled:opacity-50">← Anterior</button>
+                    <span className="font-bold py-2">Página {page} {totalPaginas > 0 && `de ${totalPaginas}`}</span>
+                    <button disabled={page >= totalPaginas || totalPaginas === 0} onClick={() => setPage(p => p + 1)} className="px-4 py-2 rounded-full bg-gray-200 disabled:opacity-50">Siguiente →</button>
+                </div>
             </div>
 
-            {/* --- FOOTER --- */}
+            {/* FOOTER */}
             <div className="bg-white py-16 px-20 border-t border-gray-200 mt-auto">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20 text-[#0D0D1B]">
-                    <div className="col-span-1 flex flex-col gap-6">
-                        <img src={"https://storage.googleapis.com/tagjs-prod.appspot.com/v1/y0WLx2RbqX/w9hmg2ml_expires_30_days.png"} className="w-48 object-contain filter invert opacity-80" alt="UniDream Logo"/>
-                        <p className="text-gray-600 text-sm leading-relaxed font-normal">Somos un equipo apasionado de estudiantes y desarrolladores comprometidos con democratizar el acceso a la orientación profesional.</p>
-                    </div>
-                    <div className="col-span-1 flex flex-col gap-4">
-                        <h4 className="text-lg font-bold mb-2 text-[#0D0D1B]">Plataforma</h4>
-                        <span className="text-gray-600 text-sm hover:text-[#1313EC] cursor-pointer font-normal" onClick={() => navigate("/carreras")}>Directorio de Carreras</span>
-                        <span className="text-gray-600 text-sm hover:text-[#1313EC] cursor-pointer font-normal" onClick={() => navigate("/universidades")}>Ranking de Universidades</span>
-                        <span className="text-gray-600 text-sm hover:text-[#1313EC] cursor-pointer font-normal">Test Vocacional IA</span>
-                    </div>
-                    <div className="col-span-1"></div>
-                    <div className="col-span-1 flex flex-col gap-4">
-                        <h4 className="text-lg font-bold mb-2 text-[#0D0D1B]">Suscríbete</h4>
-                        <div className="flex flex-col gap-3">
-                            <input type="email" placeholder="Tu correo electrónico" className="bg-gray-100 text-[#0D0D1B] p-3 rounded-full border border-gray-300 outline-none focus:border-[#1313EC] font-normal" />
-                            <button className="bg-[#1313EC] text-white py-3 rounded-full font-bold hover:bg-[#0f0fb5]" onClick={() => alert("Suscrito!")}>Suscribirme</button>
-                        </div>
-                    </div>
-                </div>
-                <div className="border-t border-gray-200 pt-8 text-center">
-                    <span className="text-gray-500 text-sm font-normal">© 2026 UniDream Platform. Todos los derechos reservados.</span>
-                </div>
+                <div className="text-center text-gray-500 text-sm">© 2026 UniDream Platform. Todos los derechos reservados.</div>
             </div>
 
-            {/* --- MODAL --- */}
+            {/* MODAL */}
             {universidadSeleccionada && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-[32px] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up">
-                        <div className="relative h-40 bg-[#1313EC] rounded-t-[32px] flex items-center justify-center">
-                            <button 
-                                onClick={() => setUniversidadSeleccionada(null)}
-                                className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-2 transition-colors"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            </button>
-                            <img src={universidadSeleccionada.imagen} className="w-24 h-24 rounded-full border-4 border-white object-cover absolute -bottom-12 shadow-lg" />
-                        </div>
-
-                        <div className="pt-16 pb-8 px-8 flex flex-col gap-6 text-center">
-                            <div>
-                                <h2 className="text-2xl font-bold text-[#0D0D1B]">{universidadSeleccionada.nombre}</h2>
-                                <span className="text-[#4C4C9A] font-medium">{universidadSeleccionada.ubicacion}</span>
-                            </div>
-
-                            <p className="text-gray-600 text-sm leading-relaxed font-normal">
-                                {universidadSeleccionada.descripcion}
-                            </p>
-
-                            <div className="bg-gray-50 rounded-2xl p-6 text-left">
-                                <h4 className="text-[#1313EC] font-bold mb-4 uppercase text-xs tracking-wider">
-                                    {filtroActivo === 'IA' ? "Recomendación de Inteligencia Artificial" : "Oferta Académica General"}
-                                </h4>
-                                
-                                {filtroActivo === 'IA' ? (
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-gray-700 font-medium">Carrera Ideal:</span>
-                                            <span className="font-bold text-[#0D0D1B]">{universidadSeleccionada.carreraSugeridaIA}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-gray-700 font-medium">Compatibilidad:</span>
-                                            <span className="text-green-600 font-bold">{universidadSeleccionada.matchIA}% Match</span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-2 font-normal">La IA ha seleccionado esta carrera basada en tus intereses previos.</p>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        <p className="text-sm text-gray-600 mb-2 font-medium">Facultades disponibles:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {universidadSeleccionada.facultades.map((fac: string, idx: number) => (
-                                                <span key={idx} className="bg-white border border-gray-200 px-3 py-1 rounded-full text-xs text-gray-700 font-normal">
-                                                    {fac}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <a 
-                                href={universidadSeleccionada.url} 
-                                target="_blank" 
-                                className="bg-[#1313EC] text-white py-4 rounded-xl font-bold hover:bg-[#0f0fb5] transition-colors w-full"
-                            >
-                                Visitar Sitio Web Oficial
-                            </a>
-                        </div>
+                    <div className="bg-white rounded-[32px] w-full max-w-2xl p-8 relative shadow-2xl">
+                        <button onClick={() => setUniversidadSeleccionada(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-xl">✕</button>
+                        <h2 className="text-2xl font-bold text-[#0D0D1B] mb-2">{universidadSeleccionada.nombre}</h2>
+                        <span className="bg-blue-100 text-[#1313EC] px-3 py-1 rounded-full text-xs font-bold uppercase">{universidadSeleccionada.tipo}</span>
+                        <p className="text-gray-600 mt-4">{universidadSeleccionada.descripcion}</p>
+                        <a href={universidadSeleccionada.url} target="_blank" rel="noopener noreferrer" className="bg-[#1313EC] text-white py-3 rounded-xl font-bold block text-center mt-6 hover:bg-[#0f0fb5]">
+                            Visitar Sitio Web Oficial
+                        </a>
                     </div>
                 </div>
             )}
         </div>
-    )
+    );
 }
