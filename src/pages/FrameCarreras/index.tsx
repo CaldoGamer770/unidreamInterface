@@ -2,29 +2,64 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Career } from "../../types/Career";
 import { getCareers } from "../../services/careers";
+import { getUserRecommendations } from "../../services/recommendations";
+import { nanoid } from "nanoid";
+import { getUserId } from "../../services/session"; // 
 
-// Definimos cuántas tarjetas queremos por pantalla
+/* =========================
+   SESIÓN
+========================= */
+
+const userId = getUserId();
+/* =========================
+   TIPOS
+========================= */
+
+type CareerWithIA = Career & {
+    esRecomendadaIA: boolean;
+};
+
+/* =========================
+   CONFIG
+========================= */
+
 const CARDS_POR_PAGINA = 6;
+
+/* =========================
+   COMPONENTE
+========================= */
 
 export default function CareersPage() {
     const navigate = useNavigate();
+    const userId = getUserId();
 
-    // CAMBIO CLAVE 1: 'allCareers' guardará TODO lo que traigamos de la base de datos
+    const [recommendedIds, setRecommendedIds] = useState<Set<string>>(new Set());
+
     const [allCareers, setAllCareers] = useState<Career[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [page, setPage] = useState(1);
 
-    // Iniciamos en "Todas" para que siempre haya contenido al inicio
-    const [filtroActivo, setFiltroActivo] = useState<"IA" | "Todas" | "Ingeniería" | "Salud">("Todas");
+    const [filtroActivo, setFiltroActivo] = useState<
+        "IA" | "Todas" | "Ingeniería" | "Salud"
+    >("Todas");
 
     const [busqueda, setBusqueda] = useState("");
-    const [carreraSeleccionada, setCarreraSeleccionada] = useState<Career | null>(null);
+    const [carreraSeleccionada, setCarreraSeleccionada] =
+        useState<Career | null>(null);
 
-    // CAMBIO 1: Bajamos a 50 para asegurar que el servidor responda rápido
-    const LIMIT_CARGA = 50;
+    /* ======== UI (NO TOCADO) ======== */
 
-// --- EFECTO DE CARGA INTELIGENTE (Loop) ---
+    const textMenuClass =
+        "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
+
+    const buttonPressEffect =
+        "transition-transform duration-100 active:scale-95";
+
+    /* =========================
+       CARGA DE TODAS LAS CARRERAS
+    ========================= */
+
     useEffect(() => {
         let isMounted = true;
         setLoading(true);
@@ -34,92 +69,152 @@ export default function CareersPage() {
                 let todasLasCarreras: Career[] = [];
                 let paginaActual = 1;
                 let seguirBuscando = true;
-                const LIMITE_SEGURO = 20; // Bajamos a 20 para evitar el Error 422
-
-                console.log("🚀 Iniciando descarga secuencial...");
+                const LIMITE_SEGURO = 20;
 
                 while (seguirBuscando) {
-                    // Pedimos un bloque pequeño
                     const data = await getCareers(paginaActual, LIMITE_SEGURO);
-                    
+
                     if (data && Array.isArray(data) && data.length > 0) {
-                        // Guardamos lo que llegó
                         todasLasCarreras = [...todasLasCarreras, ...data];
-                        console.log(`📦 Recibido bloque ${paginaActual}: ${data.length} carreras`);
-                        
-                        // Si recibimos menos del límite, significa que llegamos al final
+
                         if (data.length < LIMITE_SEGURO) {
                             seguirBuscando = false;
                         } else {
-                            paginaActual++; // Vamos por la siguiente página
+                            paginaActual++;
                         }
                     } else {
-                        // Si llega vacío o error, paramos
                         seguirBuscando = false;
                     }
                 }
 
-                if (isMounted) {
-                    console.log(`✅ Carga completa. Total carreras en memoria: ${todasLasCarreras.length}`);
-                    setAllCareers(todasLasCarreras);
-                }
-
+                if (isMounted) setAllCareers(todasLasCarreras);
             } catch (error) {
-                console.error("❌ Error en la carga secuencial:", error);
+                console.error("❌ Error cargando carreras:", error);
             } finally {
                 if (isMounted) setLoading(false);
             }
         };
 
         fetchAllData();
-
-        return () => { isMounted = false; };
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
-    const textMenuClass = "text-[#0D0D1B] text-sm transition-colors duration-300 hover:text-[#1213ed] active:text-[#1213ed] cursor-pointer font-medium";
-    const buttonPressEffect = "transition-transform duration-100 active:scale-95";
+    /* =========================
+       CARGA DE RECOMENDACIONES IA (REDIS)
+    ========================= */
 
-    // --- LÓGICA DE FILTRADO LOCAL ---
-    // 1. Filtramos la lista completa que tenemos en memoria
-    const carrerasFiltradasTotales = allCareers
-        .filter(c => {
-            // PROTECCIÓN: Si el nombre es nulo, usamos texto vacío para que no explote
+    useEffect(() => {
+        if (!userId) return;
+
+        const fetchRecommendations = async () => {
+            try {
+                const res = await getUserRecommendations(userId);
+
+                console.log("📦 Respuesta backend recomendaciones:", res);
+
+                if (!res || !Array.isArray(res.recommendations)) {
+                    console.error("❌ recommendations no es un array", res);
+                    return;
+                }
+
+                const ids = new Set<string>(
+                    res.recommendations
+                        .map((r: any) => r.career_id)
+                        .filter(Boolean)
+                );
+
+                console.log("⭐ IDs recomendados IA:", [...ids]);
+
+                setRecommendedIds(ids);
+            } catch (err) {
+                console.error("❌ Error cargando recomendaciones IA", err);
+            }
+        };
+
+        fetchRecommendations();
+    }, [userId]);
+
+
+
+
+    /* =========================
+       FILTRADO + IA
+    ========================= */
+
+    const carrerasConIA: CareerWithIA[] = allCareers.map((c) => ({
+        ...c,
+        esRecomendadaIA: recommendedIds.has(String(c.id)),
+    }));
+
+    console.log(
+        "🔍 MATCH TEST",
+        allCareers.slice(0, 5).map(c => ({
+            careerIdBackend: [...recommendedIds][0],
+            careerIdFrontend: c.id,
+            match: recommendedIds.has(String(c.id)),
+            type: typeof c.id,
+        }))
+    );
+
+    const carrerasFiltradasTotales: CareerWithIA[] = carrerasConIA
+        .filter((c) => {
             const nombreCarrera = (c.nombre || "").toLowerCase();
             return nombreCarrera.includes(busqueda.toLowerCase());
         })
-        .filter(c => {
+        .filter((c) => {
             if (filtroActivo === "Todas") return true;
-            if (filtroActivo === "IA") return (c.matchIA ?? 0) > 0;
+            if (filtroActivo === "IA") return c.esRecomendadaIA;
 
-            // PROTECCIÓN: Lo mismo para el área
-            const areaLimpia = (c.area || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const filtroLimpio = filtroActivo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const areaLimpia = (c.area || "")
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+
+            const filtroLimpio = filtroActivo
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
 
             return areaLimpia.includes(filtroLimpio);
         });
 
-    // 2. Ordenamos por IA si es necesario
     if (filtroActivo === "IA") {
-        carrerasFiltradasTotales.sort((a, b) => (b.matchIA ?? 0) - (a.matchIA ?? 0));
+        carrerasFiltradasTotales.sort((a, b) => {
+            if (a.esRecomendadaIA && !b.esRecomendadaIA) return -1;
+            if (!a.esRecomendadaIA && b.esRecomendadaIA) return 1;
+            return 0;
+        });
     }
 
-    // --- PAGINACIÓN LOCAL ---
-    // CAMBIO CLAVE 3: Cortamos la lista filtrada para mostrar solo las de la página actual
+    /* =========================
+       PAGINACIÓN
+    ========================= */
+
     const indiceUltimo = page * CARDS_POR_PAGINA;
     const indicePrimero = indiceUltimo - CARDS_POR_PAGINA;
 
-    // Esta es la lista FINAL que se mostrará en pantalla (siempre llena si hay datos)
-    const carrerasParaMostrar = carrerasFiltradasTotales.slice(indicePrimero, indiceUltimo);
+    const carrerasParaMostrar = carrerasFiltradasTotales.slice(
+        indicePrimero,
+        indiceUltimo
+    );
 
-    // Calculamos el total de páginas basado en el filtro actual
-    const totalPaginas = Math.ceil(carrerasFiltradasTotales.length / CARDS_POR_PAGINA);
+    const totalPaginas = Math.ceil(
+        carrerasFiltradasTotales.length / CARDS_POR_PAGINA
+    );
 
+    /* =========================
+       LOADING
+    ========================= */
 
     if (loading && allCareers.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1313EC]"></div>
-                <span className="text-gray-500 mt-4 font-medium">Conectando con UniDream DB...</span>
+                <span className="text-gray-500 mt-4 font-medium">
+                    Conectando con UniDream DB...
+                </span>
             </div>
         );
     }
