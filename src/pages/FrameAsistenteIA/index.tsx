@@ -146,7 +146,8 @@ export default () => {
 
                 <div className="flex flex-col w-full max-w-[900px] h-[600px] bg-white rounded-[48px] border border-black overflow-hidden shadow-2xl relative">
                     <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-6">
-                        {messages.map((msg) => (
+                        {/* Solo muestra los mensajes si no está cargando */}
+                        {!isLoading && messages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`flex gap-4 max-w-[80%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                                     {msg.sender === 'bot' && (
@@ -155,7 +156,7 @@ export default () => {
                                         </div>
                                     )}
                                     <div className={`p-4 rounded-2xl text-base leading-relaxed shadow-sm font-normal
-                                        ${msg.sender === 'user'
+                    ${msg.sender === 'user'
                                             ? 'bg-[#1313EC] text-white rounded-tr-none'
                                             : 'bg-gray-50 text-gray-800 border border-gray-200 rounded-tl-none'
                                         }`}>
@@ -165,7 +166,7 @@ export default () => {
                             </div>
                         ))}
 
-                        {/* INDICADOR DE CARGA (OPCIONAL PERO RECOMENDADO) */}
+                        {/* Solo muestra el indicador de carga si está cargando */}
                         {isLoading && (
                             <div className="flex justify-start">
                                 <div className="flex gap-4 max-w-[80%] flex-row">
@@ -178,8 +179,11 @@ export default () => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Referencia para el scroll final */}
                         <div ref={messagesEndRef} />
                     </div>
+
 
                     <div className="p-6 bg-white border-t border-gray-100">
                         {/* SUGERENCIAS */}
